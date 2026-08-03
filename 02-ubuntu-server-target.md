@@ -537,8 +537,7 @@ active
 
 ```bash
 sudo ss -tulpn | grep :22
-```
-
+``\
 ---
 
 ## 16. 从 Ubuntu 测试 Kali
@@ -548,6 +547,7 @@ sudo ss -tulpn | grep :22
 ```bash
 ping -c 3 10.10.20.10
 ```
+<img width="2560" height="1680" alt="image" src="https://github.com/user-attachments/assets/21b2f299-46e7-4ef2-82bb-1b6acddc8dbc" />
 
 ---
 
