@@ -102,7 +102,7 @@ Open VM Settings
 ```
 
 然后点击 `Save`。
-
+<img width="900" height="1030" alt="iScreen Shoter - UTM - 260803105700" src="https://github.com/user-attachments/assets/a09e3212-5c4c-4c71-882d-f6d478bac68a" />
 
 ---
 
@@ -133,6 +133,7 @@ Bridged Network
 ```
 
 `CyberLab` 不提供 DHCP，因此 Ubuntu 必须手动配置固定 IP。
+<img width="1600" height="800" alt="image" src="https://github.com/user-attachments/assets/38b5ff0e-fa40-49fd-a06a-e787cddb42bf" />
 
 ---
 
@@ -159,6 +160,7 @@ Installation type：Ubuntu Server
 ```
 
 Ubuntu Server 默认没有图形桌面，安装完成后会进入命令行界面。
+<img width="2560" height="1680" alt="image" src="https://github.com/user-attachments/assets/53184f99-dbc8-4680-9f9a-dfe08711089f" />
 
 ---
 
@@ -218,6 +220,7 @@ static 10.10.20.20/24
 ```text
 Continue without network
 ```
+<img width="2560" height="1680" alt="image" src="https://github.com/user-attachments/assets/dde02053-107e-45b9-9a04-0a6788726621" />
 
 这是正常的。选择它继续安装。
 
@@ -260,6 +263,7 @@ Guided storage configuration
 ```text
 Done
 ```
+<img width="2560" height="1680" alt="image" src="https://github.com/user-attachments/assets/d9893840-c288-4efe-8dbe-dac79a684da7" />
 
 下一页再次选择 `Done`。出现确认警告时选择：
 
@@ -304,6 +308,8 @@ Username：以后登录和 SSH 使用的用户名
 ```text
 Done
 ```
+<img width="2560" height="1680" alt="image" src="https://github.com/user-attachments/assets/a8c6d59d-e768-4656-861d-71ef9a2be657" />
+
 
 ---
 
@@ -352,6 +358,11 @@ SSH configuration
 ```text
 Done
 ```
+
+<img width="2560" height="1680" alt="image" src="https://github.com/user-attachments/assets/294cf857-dfe3-488c-926e-709ca4286aee" />
+
+<img width="2560" height="1680" alt="image" src="https://github.com/user-attachments/assets/8beea289-b02c-48d6-b324-5de7d0401d12" />
+
 
 安装完成后，可以从 Kali 通过 SSH 连接：
 
