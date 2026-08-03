@@ -582,6 +582,7 @@ ssh labuser@10.10.20.20
 ```bash
 exit
 ```
+<img width="2560" height="1680" alt="image" src="https://github.com/user-attachments/assets/ef33465b-4d6e-4e10-b040-33b31c49e164" />
 
 ---
 
