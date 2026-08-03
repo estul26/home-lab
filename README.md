@@ -150,27 +150,150 @@ Bridged Network 会让虚拟机直接进入家庭局域网，看起来像一台�
 
 ---
 
-# 6. 在 UTM 创建 CyberLab 网络
+# 6. 在 UTM 创建 CyberLab 隔离网络
 
-在 UTM 中打开：
+在安装虚拟机之前，建议先创建一个名为 `CyberLab` 的自定义 Host Network。之后，Kali、Ubuntu、Windows 和 Wazuh 都连接到这个网络。
+
+## 6.1 创建 Host Network
+
+打开 UTM，然后进入：
 
 ```text
 UTM
-→ Settings
+→ Settings…
 → Network
 → Host Networks
-→ Add
+→ 点击 +
 ```
 
-创建网络：
+填写网络名称：
 
 ```text
 Name：CyberLab
 ```
 
-四台虚拟机必须连接到同一个 `CyberLab` 网络。
+保存设置。
+
+> 在这里通常只需要创建网络名称，不需要填写 `10.10.20.0/24`。固定 IP 地址会在每台虚拟机的操作系统中手动设置。
+
+## 6.2 CyberLab 的网络作用
+
+`CyberLab` 用于让实验室中的虚拟机互相通信：
+
+```text
+Kali Linux
+Ubuntu Server
+Windows 11
+Wazuh Server
+```
+
+它们必须全部连接到同一个：
+
+```text
+Host Network：CyberLab
+```
+
+实验网卡不设置：
+
+```text
+Default Gateway：留空
+DNS：留空
+```
+
+这样，虚拟机可以在 `10.10.20.0/24` 网段内通信，但不能通过这张实验网卡访问互联网或家庭局域网。
+
+## 6.3 创建虚拟机时的后端注意事项
+
+创建 ARM64 虚拟机时选择：
+
+```text
+Create a New Virtual Machine
+→ Virtualize
+```
+
+不要选择速度较慢的：
+
+```text
+Emulate
+```
+
+如果当前 UTM 版本在 Apple Virtualization 后端中看不到自定义 `CyberLab` Host Network，请改用 QEMU 虚拟化后端。
+
+## 6.4 将虚拟机连接到 CyberLab
+
+虚拟机创建完成后，先完全关闭虚拟机，然后打开：
+
+```text
+选择虚拟机
+→ Edit
+→ Devices
+→ Network
+```
+
+设置：
+
+```text
+Network Mode：Host Network / macOS Host Only
+Host Network：CyberLab
+Emulated Network Card：virtio-net-pci
+```
+
+对下面所有虚拟机执行相同设置：
+
+- Kali Linux
+- Ubuntu Server
+- Windows 11
+- Wazuh Server
+
+每台虚拟机必须使用不同的 MAC 地址。
+
+## 6.5 CyberLab 固定 IP 规划
+
+| 虚拟机 | 固定 IP | 子网掩码 | 网关 | DNS |
+|---|---|---|---|---|
+| Kali Linux | `10.10.20.10/24` | `255.255.255.0` | 留空 | 留空 |
+| Ubuntu Server | `10.10.20.20/24` | `255.255.255.0` | 留空 | 留空 |
+| Windows 11 | `10.10.20.30/24` | `255.255.255.0` | 留空 | 留空 |
+| Wazuh Server | `10.10.20.40/24` | `255.255.255.0` | 留空 | 留空 |
+
+## 6.6 安装阶段临时上网
+
+安装系统或下载更新时，可以临时添加第二张网卡：
+
+```text
+Network Mode：macOS Shared Network
+IP：DHCP / Automatic
+用途：临时访问互联网
+```
+
+更新完成后：
+
+```text
+1. 完全关闭虚拟机
+2. 禁用或删除 Shared Network 网卡
+3. 只保留 CyberLab 实验网卡
+4. 再开始扫描或漏洞测试
+```
+
+不要把故意存在漏洞的靶机连接到：
+
+```text
+Bridged Network
+```
+
+## 6.7 创建完成检查
+
+- [ ] UTM 中已经创建 `CyberLab` Host Network
+- [ ] 所有实验虚拟机都选择同一个 `CyberLab`
+- [ ] 每台虚拟机使用不同的 MAC 地址
+- [ ] 每台虚拟机使用不同的固定 IP
+- [ ] CyberLab 网卡没有默认网关
+- [ ] CyberLab 网卡没有 DNS
+- [ ] 漏洞实验期间 Shared Network 已关闭
+- [ ] Bridged Network 未启用
 
 ---
+
 
 # 7. 给虚拟机添加实验网卡
 
