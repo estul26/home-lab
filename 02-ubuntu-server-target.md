@@ -404,7 +404,7 @@ Installation complete
 ```text
 Reboot Now
 ```
-<img width="1600" height="1280" alt="image" src="https://github.com/user-attachments/assets/75817f57-f0e9-4d13-970f-097365fbbd16" />
+<img width="1600" height="1280" alt="image" src="https://github.com/user-attachments/assets/f81769ed-5e22-4b96-9b2c-f5c87c872fbd" />
 <img width="1600" height="1280" alt="image" src="https://github.com/user-attachments/assets/9eee15e6-e553-4319-8030-25ceacb2ad56" />
 <img width="2560" height="1680" alt="image" src="https://github.com/user-attachments/assets/c1314583-4454-494e-8e8b-f46e603f7b3d" />
 
