@@ -756,6 +756,11 @@ sudo tail -f /var/log/auth.log
 ```bash
 sudo ufw status verbose
 ```
+<img width="2048" height="1344" alt="image" src="https://github.com/user-attachments/assets/b07b25dd-4e05-451a-a682-07e6a9cc2f2c" />
+<img width="2048" height="1344" alt="image" src="https://github.com/user-attachments/assets/cd448af4-a3f7-4b56-b4db-1008c41877c5" />
+<img width="2048" height="1386" alt="image" src="https://github.com/user-attachments/assets/069e490d-b472-4189-afe7-0d4e7e921bca" />
+
+
 
 ---
 
