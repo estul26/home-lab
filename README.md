@@ -1,39 +1,45 @@
-# UTM 网络安全 Home Lab 网络配置记录
+**English** | [中文](README.zh-CN.md)
 
-## 1. 实验室目标
+# Cybersecurity Home Lab — UTM Network Build & Playbook
 
-使用 MacBook Pro M5 和 UTM 创建一个隔离的网络安全实验室，用于练习：
+A self-directed security home lab built with UTM on a MacBook Pro (Apple M5). It runs an isolated attack/defense network — a Kali attacker, Ubuntu Server and Windows 11 targets, and a Wazuh SIEM — and documents the full build, the connectivity tests, and a working methodology for scanning, detection and reporting.
 
-- Nmap 网络扫描
-- 主机发现
-- TCP/UDP 端口扫描
-- 服务与版本枚举
-- Web 漏洞测试
-- SSH 登录与日志分析
-- Windows 安全日志分析
-- 防火墙配置
-- Wazuh SIEM 日志收集
-- Wireshark 流量分析
-- 安全加固与重新扫描
-- 事件响应
+This document records how the lab network is configured and how it is used for practice.
+
+## 1. Lab goals
+
+Use a MacBook Pro M5 and UTM to create an isolated cybersecurity lab for practising:
+
+- Nmap network scanning
+- Host discovery
+- TCP/UDP port scanning
+- Service and version enumeration
+- Web vulnerability testing
+- SSH logins and log analysis
+- Windows security log analysis
+- Firewall configuration
+- Wazuh SIEM log collection
+- Wireshark traffic analysis
+- Hardening and re-scanning
+- Incident response
 
 ---
 
-## 2. 主机配置
+## 2. Host configuration
 
-| 项目 | 配置 |
+| Item | Configuration |
 |---|---|
-| 主机 | MacBook Pro |
-| 芯片 | Apple M5 |
-| 内存 | 48GB |
-| 虚拟化软件 | UTM |
-| 虚拟机架构 | ARM64 |
-| 主要网络模式 | Host Network / 隔离网络 |
-| 实验网络名称 | CyberLab |
+| Host | MacBook Pro |
+| Chip | Apple M5 |
+| Memory | 48 GB |
+| Virtualization software | UTM |
+| VM architecture | ARM64 |
+| Primary network mode | Host Network / isolated network |
+| Lab network name | CyberLab |
 
 ---
 
-## 3. 网络拓扑
+## 3. Network topology
 
 ```text
                          MacBook Pro M5
@@ -45,140 +51,140 @@
        ┌───────────────────────┼───────────────────────┐
        │                       │                       │
  Kali Linux              Ubuntu Server           Windows 11
- 攻击测试机               Linux 靶机              Windows 靶机
+ Attack machine          Linux target            Windows target
  10.10.20.10             10.10.20.20             10.10.20.30
                                                        │
                                                        │
                                                Wazuh Server
-                                               日志与 SIEM
+                                               Logging & SIEM
                                                10.10.20.40
 ```
 
-所有虚拟机连接到同一个名为 `CyberLab` 的隔离网络。
+All VMs connect to the same isolated network named `CyberLab`.
 
 ---
 
-## 4. IP 地址规划
+## 4. IP address plan
 
-| 虚拟机 | 用途 | 固定 IP | 子网掩码 | 网关 | DNS |
+| VM | Role | Static IP | Netmask | Gateway | DNS |
 |---|---|---|---|---|---|
-| Kali Linux | 攻击机 | `10.10.20.10` | `/24` | 无 | 无 |
-| Ubuntu Server | Linux 靶机 | `10.10.20.20` | `/24` | 无 | 无 |
-| Windows 11 | Windows 靶机 | `10.10.20.30` | `/24` | 无 | 无 |
-| Wazuh Server | SIEM 日志服务器 | `10.10.20.40` | `/24` | 无 | 无 |
+| Kali Linux | Attacker | `10.10.20.10` | `/24` | none | none |
+| Ubuntu Server | Linux target | `10.10.20.20` | `/24` | none | none |
+| Windows 11 | Windows target | `10.10.20.30` | `/24` | none | none |
+| Wazuh Server | SIEM log server | `10.10.20.40` | `/24` | none | none |
 
-### 网络信息
+### Network information
 
 ```text
-网络名称：CyberLab
-网络地址：10.10.20.0
-CIDR：10.10.20.0/24
-子网掩码：255.255.255.0
-广播地址：10.10.20.255
-默认网关：无
-DNS：无
-DHCP：无
+Network name:    CyberLab
+Network address: 10.10.20.0
+CIDR:            10.10.20.0/24
+Subnet mask:     255.255.255.0
+Broadcast:       10.10.20.255
+Default gateway: none
+DNS:             none
+DHCP:            none
 ```
 
-### 为什么不设置网关？
+### Why no gateway?
 
-没有默认网关时，虚拟机只能与同一实验网段中的设备通信。
+With no default gateway, the VMs can only talk to devices on the same lab subnet.
 
-它们不能通过实验网卡访问：
+Through the lab interface they **cannot** reach:
 
-- 家庭局域网
-- 路由器
-- 其他家庭设备
-- 互联网
+- the home LAN
+- the router
+- other household devices
+- the internet
 
-这样可以降低漏洞靶机影响真实网络的风险。
+This reduces the risk of a vulnerable target machine affecting the real network.
 
 ---
 
-# 5. UTM 网络模式说明
+# 5. UTM network modes
 
-## 5.1 CyberLab 隔离网卡
+## 5.1 CyberLab isolated interface
 
-主要用于攻击和防御实验。
-
-```text
-Network Mode：Host Network / macOS Host Only
-Host Network：CyberLab
-IP：手动固定
-Gateway：留空
-DNS：留空
-```
-
-CyberLab 网卡用于：
-
-- Kali 扫描 Ubuntu
-- Kali 扫描 Windows
-- Kali 扫描 Wazuh
-- Ubuntu 向 Wazuh 发送日志
-- Windows 向 Wazuh 发送日志
-- Wireshark 抓取实验流量
-- 防火墙规则测试
-- Web 漏洞测试
-
-## 5.2 Shared Network 网卡
-
-Shared Network 是临时上网网卡。
+The main interface for attack and defense practice.
 
 ```text
-Network Mode：macOS Shared Network
-IP 设置：DHCP / Automatic
-用途：下载软件和系统更新
+Network Mode: Host Network / macOS Host Only
+Host Network: CyberLab
+IP:           manual / static
+Gateway:      leave blank
+DNS:          leave blank
 ```
 
-使用 Shared Network 时，UTM 会通过 Mac 提供 NAT 互联网连接。
+The CyberLab interface is used for:
+
+- Kali scanning Ubuntu
+- Kali scanning Windows
+- Kali scanning Wazuh
+- Ubuntu sending logs to Wazuh
+- Windows sending logs to Wazuh
+- Wireshark capturing lab traffic
+- Firewall rule testing
+- Web vulnerability testing
+
+## 5.2 Shared Network interface
+
+Shared Network is a temporary internet interface.
+
+```text
+Network Mode: macOS Shared Network
+IP settings:  DHCP / Automatic
+Purpose:      downloading software and system updates
+```
+
+When Shared Network is used, UTM provides NAT internet access through the Mac.
 
 ## 5.3 Bridged Network
 
-不要把故意存在漏洞的靶机连接到 Bridged Network。
+Do **not** connect deliberately vulnerable targets to Bridged Network.
 
-Bridged Network 会让虚拟机直接进入家庭局域网，看起来像一台真实的家庭设备。
+Bridged Network places a VM directly on the home LAN, where it looks like a real household device.
 
-不建议用于：
+Not recommended for:
 
 - OWASP Juice Shop
 - WebGoat
 - Metasploitable
-- 故意使用弱密码的服务器
-- 未打补丁的 Windows
-- 恶意软件分析
-- 漏洞利用实验
+- servers with intentionally weak passwords
+- unpatched Windows
+- malware analysis
+- exploitation practice
 
 ---
 
-# 6. 在 UTM 创建 CyberLab 隔离网络
+# 6. Creating the CyberLab isolated network in UTM
 
-在安装虚拟机之前，建议先创建一个名为 `CyberLab` 的自定义 Host Network。之后，Kali、Ubuntu、Windows 和 Wazuh 都连接到这个网络。
+Before installing the VMs, create a custom Host Network named `CyberLab`. Kali, Ubuntu, Windows and Wazuh then all connect to it.
 
-## 6.1 创建 Host Network
+## 6.1 Create the Host Network
 
-打开 UTM，然后进入：
+Open UTM and go to:
 
 ```text
 UTM
 → Settings…
 → Network
 → Host Networks
-→ 点击 +
+→ click +
 ```
 
-填写网络名称：
+Set the network name:
 
 ```text
-Name：CyberLab
+Name: CyberLab
 ```
 
-保存设置。
+Save the settings.
 
-> 在这里通常只需要创建网络名称，不需要填写 `10.10.20.0/24`。固定 IP 地址会在每台虚拟机的操作系统中手动设置。
+> Usually you only need to create the network name here; you don't need to enter `10.10.20.0/24`. The static IP addresses are set manually in each VM's operating system.
 
-## 6.2 CyberLab 的网络作用
+## 6.2 What CyberLab is for
 
-`CyberLab` 用于让实验室中的虚拟机互相通信：
+`CyberLab` lets the lab VMs communicate with each other:
 
 ```text
 Kali Linux
@@ -187,153 +193,153 @@ Windows 11
 Wazuh Server
 ```
 
-它们必须全部连接到同一个：
+They must all connect to the same:
 
 ```text
-Host Network：CyberLab
+Host Network: CyberLab
 ```
 
-实验网卡不设置：
+The lab interface does not set:
 
 ```text
-Default Gateway：留空
-DNS：留空
+Default Gateway: leave blank
+DNS:             leave blank
 ```
 
-这样，虚拟机可以在 `10.10.20.0/24` 网段内通信，但不能通过这张实验网卡访问互联网或家庭局域网。
+This way the VMs can communicate within `10.10.20.0/24`, but cannot reach the internet or home LAN through the lab interface.
 
-## 6.3 创建虚拟机时的后端注意事项
+## 6.3 Backend notes when creating VMs
 
-创建 ARM64 虚拟机时选择：
+When creating an ARM64 VM, choose:
 
 ```text
 Create a New Virtual Machine
 → Virtualize
 ```
 
-不要选择速度较慢的：
+Do not choose the slower:
 
 ```text
 Emulate
 ```
 
-如果当前 UTM 版本在 Apple Virtualization 后端中看不到自定义 `CyberLab` Host Network，请改用 QEMU 虚拟化后端。
+If your current UTM version cannot see the custom `CyberLab` Host Network under the Apple Virtualization backend, switch to the QEMU virtualization backend.
 
-## 6.4 将虚拟机连接到 CyberLab
+## 6.4 Connecting a VM to CyberLab
 
-虚拟机创建完成后，先完全关闭虚拟机，然后打开：
+After a VM is created, fully shut it down, then open:
 
 ```text
-选择虚拟机
+Select the VM
 → Edit
 → Devices
 → Network
 ```
 
-设置：
+Set:
 
 ```text
-Network Mode：Host Network / macOS Host Only
-Host Network：CyberLab
-Emulated Network Card：virtio-net-pci
+Network Mode:          Host Network / macOS Host Only
+Host Network:          CyberLab
+Emulated Network Card: virtio-net-pci
 ```
 
-对下面所有虚拟机执行相同设置：
+Apply the same settings to all of:
 
 - Kali Linux
 - Ubuntu Server
 - Windows 11
 - Wazuh Server
 
-每台虚拟机必须使用不同的 MAC 地址。
+Each VM must use a different MAC address.
 
-## 6.5 CyberLab 固定 IP 规划
+## 6.5 CyberLab static IP plan
 
-| 虚拟机 | 固定 IP | 子网掩码 | 网关 | DNS |
+| VM | Static IP | Netmask | Gateway | DNS |
 |---|---|---|---|---|
-| Kali Linux | `10.10.20.10/24` | `255.255.255.0` | 留空 | 留空 |
-| Ubuntu Server | `10.10.20.20/24` | `255.255.255.0` | 留空 | 留空 |
-| Windows 11 | `10.10.20.30/24` | `255.255.255.0` | 留空 | 留空 |
-| Wazuh Server | `10.10.20.40/24` | `255.255.255.0` | 留空 | 留空 |
+| Kali Linux | `10.10.20.10/24` | `255.255.255.0` | blank | blank |
+| Ubuntu Server | `10.10.20.20/24` | `255.255.255.0` | blank | blank |
+| Windows 11 | `10.10.20.30/24` | `255.255.255.0` | blank | blank |
+| Wazuh Server | `10.10.20.40/24` | `255.255.255.0` | blank | blank |
 
-## 6.6 安装阶段临时上网
+## 6.6 Temporary internet during install
 
-安装系统或下载更新时，可以临时添加第二张网卡：
-
-```text
-Network Mode：macOS Shared Network
-IP：DHCP / Automatic
-用途：临时访问互联网
-```
-
-更新完成后：
+When installing an OS or downloading updates, add a temporary second interface:
 
 ```text
-1. 完全关闭虚拟机
-2. 禁用或删除 Shared Network 网卡
-3. 只保留 CyberLab 实验网卡
-4. 再开始扫描或漏洞测试
+Network Mode: macOS Shared Network
+IP:           DHCP / Automatic
+Purpose:      temporary internet access
 ```
 
-不要把故意存在漏洞的靶机连接到：
+When updates are finished:
+
+```text
+1. Fully shut down the VM
+2. Disable or remove the Shared Network interface
+3. Keep only the CyberLab lab interface
+4. Then start scanning or vulnerability testing
+```
+
+Do not connect deliberately vulnerable targets to:
 
 ```text
 Bridged Network
 ```
 
-## 6.7 创建完成检查
+## 6.7 Post-creation checklist
 
-- [ ] UTM 中已经创建 `CyberLab` Host Network
-- [ ] 所有实验虚拟机都选择同一个 `CyberLab`
-- [ ] 每台虚拟机使用不同的 MAC 地址
-- [ ] 每台虚拟机使用不同的固定 IP
-- [ ] CyberLab 网卡没有默认网关
-- [ ] CyberLab 网卡没有 DNS
-- [ ] 漏洞实验期间 Shared Network 已关闭
-- [ ] Bridged Network 未启用
+- [ ] `CyberLab` Host Network created in UTM
+- [ ] All lab VMs set to the same `CyberLab`
+- [ ] Each VM uses a different MAC address
+- [ ] Each VM uses a different static IP
+- [ ] CyberLab interface has no default gateway
+- [ ] CyberLab interface has no DNS
+- [ ] Shared Network disabled during vulnerability practice
+- [ ] Bridged Network not enabled
 
 ---
 
 
-# 7. 给虚拟机添加实验网卡
+# 7. Adding the lab interface to a VM
 
-对每台虚拟机执行：
+For each VM:
 
 ```text
-1. 完全关闭虚拟机
-2. 在 UTM 中选择虚拟机
-3. 点击 Edit
-4. 打开 Devices
-5. 添加或选择 Network
-6. Network Mode 选择 Host Network 或 macOS Host Only
-7. Host Network 选择 CyberLab
-8. 保存配置
+1. Fully shut down the VM
+2. Select the VM in UTM
+3. Click Edit
+4. Open Devices
+5. Add or select Network
+6. Set Network Mode to Host Network or macOS Host Only
+7. Set Host Network to CyberLab
+8. Save the configuration
 ```
 
-建议使用的虚拟网卡型号：
+Recommended virtual NIC model:
 
 ```text
 virtio-net-pci
 ```
 
-每台虚拟机必须拥有不同的 MAC 地址。
+Each VM must have a different MAC address.
 
-不要复制相同的 MAC 地址到多台虚拟机。
+Do not copy the same MAC address onto multiple VMs.
 
 ---
 
-# 8. Kali Linux 网络配置
+# 8. Kali Linux network configuration
 
-## 8.1 推荐资源配置
+## 8.1 Recommended resources
 
 ```text
-CPU：6 cores
-RAM：8GB
-Disk：60GB
-IP：10.10.20.10/24
+CPU:  6 cores
+RAM:  8 GB
+Disk: 60 GB
+IP:   10.10.20.10/24
 ```
 
-## 8.2 查看网卡名称
+## 8.2 Check the interface name
 
 ```bash
 ip -br link
@@ -343,7 +349,7 @@ ip -br link
 nmcli device status
 ```
 
-网卡名称可能是：
+The interface name may be:
 
 ```text
 eth0
@@ -351,9 +357,9 @@ ens5
 enp0s1
 ```
 
-## 8.3 图形界面设置
+## 8.3 GUI setup
 
-打开：
+Open:
 
 ```text
 Settings
@@ -363,32 +369,32 @@ Settings
 → Manual
 ```
 
-填写：
+Fill in:
 
 ```text
-Address：10.10.20.10
-Netmask：255.255.255.0
-Gateway：留空
-DNS：留空
+Address: 10.10.20.10
+Netmask: 255.255.255.0
+Gateway: leave blank
+DNS:     leave blank
 ```
 
-保存后，断开并重新连接网卡。
+After saving, disconnect and reconnect the interface.
 
-## 8.4 使用 nmcli 设置
+## 8.4 Setup with nmcli
 
-查看连接名称：
+Show connection names:
 
 ```bash
 nmcli connection show
 ```
 
-假设连接名称是：
+Assume the connection name is:
 
 ```text
 Wired connection 1
 ```
 
-执行：
+Run:
 
 ```bash
 sudo nmcli connection modify "Wired connection 1" \
@@ -399,14 +405,14 @@ sudo nmcli connection modify "Wired connection 1" \
   ipv4.never-default yes
 ```
 
-重新连接：
+Reconnect:
 
 ```bash
 sudo nmcli connection down "Wired connection 1"
 sudo nmcli connection up "Wired connection 1"
 ```
 
-检查：
+Check:
 
 ```bash
 ip -br address
@@ -416,52 +422,52 @@ ip -br address
 ip route
 ```
 
-预期结果：
+Expected result:
 
 ```text
 10.10.20.10/24
 ```
 
-实验网卡不应该出现默认路由。
+The lab interface should have no default route.
 
 ---
 
-# 9. Ubuntu Server 网络配置
+# 9. Ubuntu Server network configuration
 
-## 9.1 推荐资源配置
+## 9.1 Recommended resources
 
 ```text
-CPU：4 cores
-RAM：6GB
-Disk：50GB
-IP：10.10.20.20/24
+CPU:  4 cores
+RAM:  6 GB
+Disk: 50 GB
+IP:   10.10.20.20/24
 ```
 
-## 9.2 查看网卡名称
+## 9.2 Check the interface name
 
 ```bash
 ip -br link
 ```
 
-假设实验网卡名称为：
+Assume the lab interface name is:
 
 ```text
 enp0s1
 ```
 
-## 9.3 查看 Netplan 配置
+## 9.3 Edit the Netplan configuration
 
 ```bash
 ls /etc/netplan
 ```
 
-创建或编辑配置：
+Create or edit the configuration:
 
 ```bash
 sudo nano /etc/netplan/01-cyberlab.yaml
 ```
 
-填写：
+Fill in:
 
 ```yaml
 network:
@@ -473,21 +479,21 @@ network:
         - 10.10.20.20/24
 ```
 
-注意：必须将 `enp0s1` 替换成实际网卡名称。
+Note: replace `enp0s1` with the actual interface name.
 
-测试配置：
+Test the configuration:
 
 ```bash
 sudo netplan try
 ```
 
-应用配置：
+Apply the configuration:
 
 ```bash
 sudo netplan apply
 ```
 
-检查：
+Check:
 
 ```bash
 ip -br address
@@ -497,7 +503,7 @@ ip -br address
 ip route
 ```
 
-预期结果：
+Expected result:
 
 ```text
 10.10.20.20/24
@@ -505,62 +511,62 @@ ip route
 
 ---
 
-# 10. Windows 11 网络配置
+# 10. Windows 11 network configuration
 
-## 10.1 推荐资源配置
+## 10.1 Recommended resources
 
 ```text
-CPU：6 cores
-RAM：12GB
-Disk：100GB
-IP：10.10.20.30/24
+CPU:  6 cores
+RAM:  12 GB
+Disk: 100 GB
+IP:   10.10.20.30/24
 ```
 
-## 10.2 打开网络适配器
+## 10.2 Open network adapters
 
-按：
+Press:
 
 ```text
 Win + R
 ```
 
-输入：
+Enter:
 
 ```text
 ncpa.cpl
 ```
 
-选择实验网卡：
+Select the lab interface:
 
 ```text
-右键网卡
+Right-click the adapter
 → Properties
 → Internet Protocol Version 4
 → Properties
 ```
 
-填写：
+Fill in:
 
 ```text
-IP address：10.10.20.30
-Subnet mask：255.255.255.0
-Default gateway：留空
+IP address:      10.10.20.30
+Subnet mask:     255.255.255.0
+Default gateway: leave blank
 
-Preferred DNS：留空
-Alternate DNS：留空
+Preferred DNS:   leave blank
+Alternate DNS:   leave blank
 ```
 
-## 10.3 重命名网卡
+## 10.3 Rename the adapter
 
-建议将实验网卡重命名为：
+Rename the lab interface to:
 
 ```text
 LAB
 ```
 
-## 10.4 将网络设置为 Private
+## 10.4 Set the network to Private
 
-管理员 PowerShell：
+In an administrator PowerShell:
 
 ```powershell
 Set-NetConnectionProfile `
@@ -568,23 +574,23 @@ Set-NetConnectionProfile `
   -NetworkCategory Private
 ```
 
-查看 IP 地址：
+Show the IP address:
 
 ```powershell
 ipconfig
 ```
 
-或者：
+Or:
 
 ```powershell
 Get-NetIPAddress -AddressFamily IPv4
 ```
 
-## 10.5 允许实验网络 Ping Windows
+## 10.5 Allow the lab network to ping Windows
 
-Windows 防火墙可能默认阻止 ICMP。
+Windows Firewall may block ICMP by default.
 
-管理员 PowerShell：
+In an administrator PowerShell:
 
 ```powershell
 New-NetFirewallRule `
@@ -596,36 +602,36 @@ New-NetFirewallRule `
   -Action Allow
 ```
 
-这个规则只允许 CyberLab 网段 Ping Windows。
+This rule only allows the CyberLab subnet to ping Windows.
 
 ---
 
-# 11. Wazuh Server 网络配置
+# 11. Wazuh Server network configuration
 
-## 11.1 推荐资源配置
+## 11.1 Recommended resources
 
 ```text
-CPU：4 cores
-RAM：8GB
-Disk：80GB
-IP：10.10.20.40/24
+CPU:  4 cores
+RAM:  8 GB
+Disk: 80 GB
+IP:   10.10.20.40/24
 ```
 
-如果 Wazuh 安装在 Ubuntu Server 上，使用 Netplan 配置。
+If Wazuh is installed on Ubuntu Server, configure it with Netplan.
 
-查看网卡：
+Check the interface:
 
 ```bash
 ip -br link
 ```
 
-编辑：
+Edit:
 
 ```bash
 sudo nano /etc/netplan/01-cyberlab.yaml
 ```
 
-填写：
+Fill in:
 
 ```yaml
 network:
@@ -637,7 +643,7 @@ network:
         - 10.10.20.40/24
 ```
 
-应用：
+Apply:
 
 ```bash
 sudo netplan try
@@ -647,19 +653,19 @@ sudo netplan try
 sudo netplan apply
 ```
 
-确认：
+Confirm:
 
 ```bash
 ip -br address
 ```
 
-预期：
+Expected:
 
 ```text
 10.10.20.40/24
 ```
 
-安装 Wazuh Agent 时，Manager 地址使用：
+When installing the Wazuh agent, use this Manager address:
 
 ```text
 10.10.20.40
@@ -667,9 +673,9 @@ ip -br address
 
 ---
 
-# 12. 网络连通性测试
+# 12. Connectivity tests
 
-## 12.1 从 Kali 测试其他虚拟机
+## 12.1 Test other VMs from Kali
 
 ```bash
 ping -c 3 10.10.20.20
@@ -683,13 +689,13 @@ ping -c 3 10.10.20.30
 ping -c 3 10.10.20.40
 ```
 
-## 12.2 主机发现
+## 12.2 Host discovery
 
 ```bash
 sudo nmap -sn 10.10.20.0/24
 ```
 
-预期发现：
+Expected discovery:
 
 ```text
 10.10.20.10    Kali Linux
@@ -698,41 +704,41 @@ sudo nmap -sn 10.10.20.0/24
 10.10.20.40    Wazuh Server
 ```
 
-## 12.3 Windows 测试 Ubuntu SSH
+## 12.3 Test Ubuntu SSH from Windows
 
-PowerShell：
+PowerShell:
 
 ```powershell
 Test-NetConnection 10.10.20.20 -Port 22
 ```
 
-如果 Ubuntu SSH 正常，应该显示：
+If Ubuntu SSH is working, it should show:
 
 ```text
 TcpTestSucceeded : True
 ```
 
-## 12.4 Kali 测试 Ubuntu SSH
+## 12.4 Test Ubuntu SSH from Kali
 
 ```bash
 ssh labuser@10.10.20.20
 ```
 
-## 12.5 测试 Web 服务
+## 12.5 Test web services
 
-如果 Ubuntu 运行 Juice Shop：
+If Ubuntu runs Juice Shop:
 
 ```text
 http://10.10.20.20:3000
 ```
 
-如果 Ubuntu 运行 WebGoat：
+If Ubuntu runs WebGoat:
 
 ```text
 http://10.10.20.20:8080/WebGoat
 ```
 
-如果 Wazuh Dashboard 已启动：
+If the Wazuh Dashboard is up:
 
 ```text
 https://10.10.20.40
@@ -740,90 +746,90 @@ https://10.10.20.40
 
 ---
 
-# 13. 验证实验网络是否隔离
+# 13. Verify the lab network is isolated
 
-只有 CyberLab 网卡时，在 Kali 或 Ubuntu 中测试：
+With only the CyberLab interface attached, test from Kali or Ubuntu:
 
 ```bash
 ping -c 3 1.1.1.1
 ```
 
-应该失败。
+This should fail.
 
-再测试：
+Then test:
 
 ```bash
 curl https://example.com
 ```
 
-也应该失败。
+This should also fail.
 
-查看路由表：
+View the routing table:
 
 ```bash
 ip route
 ```
 
-正常情况下只应看到：
+Normally you should only see:
 
 ```text
-10.10.20.0/24 dev <实验网卡>
+10.10.20.0/24 dev <lab interface>
 ```
 
-不应该看到：
+You should not see:
 
 ```text
 default via ...
 ```
 
-这表示实验网卡没有默认网关。
+This confirms the lab interface has no default gateway.
 
 ---
 
-# 14. 临时连接互联网的方法
+# 14. Temporary internet access
 
-需要下载工具或更新系统时，为虚拟机添加第二张网卡。
+When you need to download tools or update the system, add a temporary second interface to the VM.
 
-## 网卡一：CyberLab
-
-```text
-用途：攻防实验
-IP：固定
-Gateway：无
-DNS：无
-```
-
-## 网卡二：Shared Network
+## Interface 1: CyberLab
 
 ```text
-用途：下载和更新
-IP：DHCP
-Gateway：自动
-DNS：自动
+Purpose: attack/defense practice
+IP:      static
+Gateway: none
+DNS:     none
 ```
 
-## 更新模式
+## Interface 2: Shared Network
 
 ```text
-1. 关闭漏洞服务
-2. 关闭虚拟机
-3. 添加或启用 Shared Network 网卡
-4. 启动虚拟机
-5. 更新系统
-6. 下载需要的软件
-7. 关闭虚拟机
-8. 禁用或删除 Shared Network 网卡
-9. 重新进入隔离实验模式
+Purpose: downloads and updates
+IP:      DHCP
+Gateway: automatic
+DNS:     automatic
 ```
 
-Ubuntu 更新：
+## Update workflow
+
+```text
+1. Stop vulnerable services
+2. Shut down the VM
+3. Add or enable the Shared Network interface
+4. Start the VM
+5. Update the system
+6. Download the software you need
+7. Shut down the VM
+8. Disable or remove the Shared Network interface
+9. Return to isolated lab mode
+```
+
+Ubuntu updates:
 
 ```bash
 sudo apt update
 sudo apt upgrade
 ```
 
-Kali 更新：
+Kali updates:
 
 ```bash
 sudo apt update
@@ -832,25 +838,25 @@ sudo apt full-upgrade
 
 ---
 
-# 15. 攻击实验前检查
+# 15. Pre-attack checklist
 
-- [ ] Kali 连接 CyberLab
-- [ ] Ubuntu 连接 CyberLab
-- [ ] Windows 连接 CyberLab
-- [ ] Wazuh 连接 CyberLab
-- [ ] 所有机器使用不同 IP
-- [ ] 所有机器使用不同 MAC 地址
-- [ ] 实验网卡没有默认网关
-- [ ] 实验网卡没有 DNS
-- [ ] Shared Network 已关闭
-- [ ] Bridged Network 未启用
-- [ ] 靶机无法访问互联网
-- [ ] 已创建虚拟机快照
-- [ ] 已确认扫描目标属于自己的实验环境
+- [ ] Kali connected to CyberLab
+- [ ] Ubuntu connected to CyberLab
+- [ ] Windows connected to CyberLab
+- [ ] Wazuh connected to CyberLab
+- [ ] All machines use different IPs
+- [ ] All machines use different MAC addresses
+- [ ] Lab interface has no default gateway
+- [ ] Lab interface has no DNS
+- [ ] Shared Network disabled
+- [ ] Bridged Network not enabled
+- [ ] Targets cannot reach the internet
+- [ ] VM snapshots created
+- [ ] Confirmed the scan targets belong to your own lab
 
 ---
 
-# 16. 推荐快照名称
+# 16. Recommended snapshot names
 
 ## Kali Linux
 
@@ -887,9 +893,9 @@ sudo apt full-upgrade
 
 ---
 
-# 17. 第一次扫描实验
+# 17. First scan exercise
 
-## 17.1 查看 Kali 网络
+## 17.1 Check the Kali network
 
 ```bash
 ip -br address
@@ -899,49 +905,49 @@ ip -br address
 ip route
 ```
 
-## 17.2 发现实验室设备
+## 17.2 Discover lab devices
 
 ```bash
 sudo nmap -sn 10.10.20.0/24
 ```
 
-## 17.3 扫描 Ubuntu 常见端口
+## 17.3 Scan Ubuntu's common ports
 
 ```bash
 nmap 10.10.20.20
 ```
 
-## 17.4 服务版本扫描
+## 17.4 Service version scan
 
 ```bash
 sudo nmap -sV 10.10.20.20
 ```
 
-## 17.5 扫描全部 TCP 端口
+## 17.5 Scan all TCP ports
 
 ```bash
 sudo nmap -sS -p- 10.10.20.20
 ```
 
-## 17.6 扫描 Windows
+## 17.6 Scan Windows
 
 ```bash
 sudo nmap -sV 10.10.20.30
 ```
 
-## 17.7 扫描 Wazuh Server
+## 17.7 Scan the Wazuh Server
 
 ```bash
 sudo nmap -sV 10.10.20.40
 ```
 
-## 17.8 保存扫描结果
+## 17.8 Save scan results
 
 ```bash
 sudo nmap -sV 10.10.20.20 -oA ubuntu-initial-scan
 ```
 
-这会生成：
+This produces:
 
 ```text
 ubuntu-initial-scan.nmap
@@ -951,51 +957,51 @@ ubuntu-initial-scan.xml
 
 ---
 
-# 18. Wireshark 过滤器
+# 18. Wireshark filters
 
-查看实验网段：
+View the lab subnet:
 
 ```text
 net 10.10.20.0/24
 ```
 
-查看 Ubuntu 流量：
+View Ubuntu traffic:
 
 ```text
 ip.addr == 10.10.20.20
 ```
 
-查看 Windows 流量：
+View Windows traffic:
 
 ```text
 ip.addr == 10.10.20.30
 ```
 
-查看 TCP SYN：
+View TCP SYN:
 
 ```text
 tcp.flags.syn == 1
 ```
 
-查看 SSH：
+View SSH:
 
 ```text
 tcp.port == 22
 ```
 
-查看 HTTP：
+View HTTP:
 
 ```text
 http
 ```
 
-查看 ICMP：
+View ICMP:
 
 ```text
 icmp
 ```
 
-查看 ARP：
+View ARP:
 
 ```text
 arp
@@ -1003,65 +1009,65 @@ arp
 
 ---
 
-# 19. 安全规则
+# 19. Safety rules
 
-只允许测试：
+Only test:
 
-- 自己创建的虚拟机
-- 自己拥有的设备
-- 故意存在漏洞的靶机
-- 明确授权的系统
-- 专业网络安全训练平台
+- VMs you created yourself
+- devices you own
+- deliberately vulnerable targets
+- systems you are explicitly authorized to test
+- professional cybersecurity training platforms
 
-不要扫描：
+Do not scan:
 
-- 学校网络
-- 公司网络
-- 公共 Wi-Fi
-- 邻居网络
-- 随机公网 IP
-- 未授权网站
-- 非自己的云服务器
-- 家庭中不属于实验范围的设备
+- school networks
+- company networks
+- public Wi-Fi
+- a neighbour's network
+- random public IPs
+- unauthorized websites
+- cloud servers that are not yours
+- household devices outside the lab scope
 
-不要在真实网络中运行：
+Do not run against real networks:
 
-- 密码爆破
-- 漏洞利用
-- ARP 欺骗
-- 恶意软件
-- 拒绝服务测试
-- 大量自动扫描
-- 未授权 Web 测试
+- password brute-forcing
+- exploitation
+- ARP spoofing
+- malware
+- denial-of-service testing
+- heavy automated scanning
+- unauthorized web testing
 
 ---
 
-# 20. 实验记录模板
+# 20. Lab log template
 
 ## Lab Information
 
 ```text
-Lab Name：
-Date：
-Student：
-Target：
-Attacker：
-Network：
-Authorization：
+Lab Name:
+Date:
+Student:
+Target:
+Attacker:
+Network:
+Authorization:
 ```
 
 ## Objective
 
 ```text
-本次实验的目标是什么？
+What is the goal of this lab?
 ```
 
 ## Scope
 
 ```text
-允许测试的 IP：
-禁止测试的设备：
-允许使用的工具：
+IPs allowed to test:
+Devices not to test:
+Tools allowed:
 ```
 
 ## Network Diagram
@@ -1077,151 +1083,153 @@ Ubuntu 10.10.20.20
 ## Commands
 
 ```bash
-# 在这里记录使用的命令
+# Record the commands you used here
 ```
 
 ## Findings
 
 | Finding | Evidence | Risk | Recommendation |
 |---|---|---|---|
-| 示例：SSH 对整个网段开放 | TCP 22 Open | Medium | 限制来源 IP |
+| Example: SSH open to the whole subnet | TCP 22 open | Medium | Restrict source IPs |
 
 ## Screenshots
 
 ```text
-添加截图文件名称或路径。
+Add screenshot file names or paths.
 ```
 
 ## Remediation
 
 ```text
-记录进行了哪些修复。
+Record what fixes you applied.
 ```
 
 ## Verification
 
 ```text
-修复后重新扫描并记录结果。
+Re-scan after remediation and record the results.
 ```
 
 ## Lessons Learned
 
 ```text
-本次实验学到了什么？
-哪些步骤出现问题？
-下一次应该如何改进？
+What did you learn in this lab?
+Which steps went wrong?
+What should you improve next time?
 ```
 
 ---
 
-# 21. 最终配置摘要
+# 21. Final configuration summary
 
 ```text
-CyberLab：10.10.20.0/24
+CyberLab: 10.10.20.0/24
 
-Kali Linux：
+Kali Linux:
 10.10.20.10
 
-Ubuntu Server：
+Ubuntu Server:
 10.10.20.20
 
-Windows 11：
+Windows 11:
 10.10.20.30
 
-Wazuh Server：
+Wazuh Server:
 10.10.20.40
 
-Subnet Mask：
+Subnet Mask:
 255.255.255.0
 
-Gateway：
-无
+Gateway:
+none
 
-DNS：
-无
+DNS:
+none
 
-Internet：
-默认关闭
+Internet:
+off by default
 
-Temporary Internet：
+Temporary Internet:
 UTM Shared Network
 
-禁止使用：
+Do not use:
 Bridged Network
 ```
 
 ---
 
-# 22. 核心原则
+# 22. Core principles
 
-1. 四台虚拟机必须连接同一个 `CyberLab` Host Network。
-2. 每台机器使用不同的固定 IP。
-3. CyberLab 网卡不设置网关和 DNS。
-4. 漏洞实验期间关闭 Shared Network。
-5. 不使用 Bridged Network 连接漏洞靶机。
-6. 攻击前创建快照。
-7. 只扫描和攻击自己拥有或明确授权的目标。
-8. 每次实验都记录扫描、证据、修复和验证结果。
-
-
-
-
-# 渗透测试人员通常是怎么工作的？
-
-正规的渗透测试并不是一上来就“攻击”。标准流程通常是：
-
-> **获得书面授权 → 确认范围 → 信息收集 → 扫描 → 枚举 → 验证漏洞 → 控制影响 → 写报告 → 协助修复 → 重新测试**
-
-真正工作中，沟通、记录和写报告通常与使用工具同样重要。
+1. All four VMs must connect to the same `CyberLab` Host Network.
+2. Each machine uses a different static IP.
+3. The CyberLab interface has no gateway and no DNS.
+4. Disable Shared Network during vulnerability practice.
+5. Never connect a vulnerable target with Bridged Network.
+6. Take a snapshot before attacking.
+7. Only scan and attack targets you own or are explicitly authorized to test.
+8. For every lab, record the scan, evidence, remediation and verification results.
 
 ---
 
-## 1. 确认授权和测试范围
 
-测试前，客户必须明确同意。
 
-通常需要确认：
 
-- 哪些 IP、域名和服务器允许测试
-- 哪些系统不能测试
-- 测试日期和时间
-- 是否允许进行密码测试
-- 是否允许进行漏洞利用
-- 是否允许社会工程
-- 是否允许测试生产环境
-- 出现故障时联系谁
-- 什么情况下必须立即停止
+# How penetration testers actually work
 
-关键术语：
+Real penetration testing doesn't start by "attacking." The standard process is usually:
 
-| 术语 | 含义 |
+> **Get written authorization → confirm scope → reconnaissance → scanning → enumeration → verify vulnerabilities → control impact → write the report → assist with remediation → re-test**
+
+In real work, communication, documentation and report writing are usually as important as using the tools.
+
+---
+
+## 1. Confirm authorization and scope
+
+Before testing, the client must explicitly agree.
+
+Typically you confirm:
+
+- which IPs, domains and servers may be tested
+- which systems must not be tested
+- the test dates and times
+- whether password testing is allowed
+- whether exploitation is allowed
+- whether social engineering is allowed
+- whether production environments may be tested
+- who to contact if something breaks
+- under what conditions you must stop immediately
+
+Key terms:
+
+| Term | Meaning |
 |---|---|
-| Scope | 测试范围 |
-| Rules of Engagement | 交战规则 |
-| Authorization | 测试授权 |
+| Scope | What may be tested |
+| Rules of Engagement | How testing must be conducted |
+| Authorization | Permission to test |
 
-没有授权时，即使只是扫描端口，也可能产生法律问题。
+Without authorization, even just scanning ports can create legal problems.
 
 ---
 
-## 2. 信息收集（Reconnaissance）
+## 2. Reconnaissance
 
-测试人员先了解目标，而不是马上攻击。
+Testers understand the target first, rather than attacking immediately.
 
-### 2.1 被动信息收集
+### 2.1 Passive reconnaissance
 
-尽量不直接接触目标系统，例如：
+Avoid touching the target system directly where possible — for example:
 
-- 公司网站
-- DNS 记录
-- 公开 IP 范围
-- 员工公开信息
-- 技术招聘广告
-- 公开代码仓库
-- 泄露的电子邮件地址
-- 使用的云服务或技术
+- the company website
+- DNS records
+- public IP ranges
+- public employee information
+- technical job postings
+- public code repositories
+- leaked email addresses
+- the cloud services or technologies in use
 
-例如，招聘广告可能暴露以下技术环境：
+For example, a job posting might reveal the following tech environment:
 
 ```text
 Windows Server
@@ -1231,33 +1239,33 @@ AWS
 Fortinet Firewall
 ```
 
-这些信息可以帮助测试人员理解企业环境。
+This information helps the tester understand the enterprise environment.
 
-### 2.2 主动信息收集
+### 2.2 Active reconnaissance
 
-主动与授权目标通信，例如：
+Communicate directly with the authorized target — for example:
 
-- Ping 主机
-- 端口扫描
-- DNS 查询
-- Web 服务器探测
-- 服务版本识别
+- pinging hosts
+- port scanning
+- DNS queries
+- probing web servers
+- identifying service versions
 
 ---
 
-## 3. 主机和端口扫描
+## 3. Host and port scanning
 
-测试人员需要建立资产清单：
+The tester needs to build an asset inventory:
 
 ```text
-哪些主机在线？
-哪些端口开放？
-哪些服务正在运行？
-服务版本是什么？
-是否存在不必要的服务？
+Which hosts are online?
+Which ports are open?
+Which services are running?
+What are the service versions?
+Are there unnecessary services?
 ```
 
-常见工具：
+Common tools:
 
 - Nmap
 - Masscan
@@ -1265,19 +1273,19 @@ Fortinet Firewall
 - OpenVAS / Greenbone
 - Nuclei
 
-在隔离实验室中，可以先发现主机：
+In the isolated lab, discover hosts first:
 
 ```bash
 nmap -sn 10.10.20.0/24
 ```
 
-然后识别目标服务：
+Then identify the target services:
 
 ```bash
 nmap -sV 10.10.20.20
 ```
 
-结果可能类似：
+The result might look like:
 
 ```text
 22/tcp    open    ssh
@@ -1285,291 +1293,291 @@ nmap -sV 10.10.20.20
 3000/tcp  open    web application
 ```
 
-扫描结果只代表“可能存在问题”，不等于已经确认漏洞。
+Scan results only indicate "a possible problem"; they do not confirm a vulnerability.
 
 ---
 
-## 4. 枚举（Enumeration）
+## 4. Enumeration
 
-枚举比普通扫描更深入。
+Enumeration goes deeper than a plain scan.
 
-测试人员会尝试了解：
+Testers try to learn:
 
-- Web 目录和 API
-- 用户名格式
-- SMB 共享
-- 域名和子域名
-- DNS 信息
-- SSL/TLS 证书
-- 软件版本
-- 登录页面
-- 身份验证方式
-- 文件和文件夹权限
-- Active Directory 信息
+- web directories and APIs
+- username formats
+- SMB shares
+- domains and subdomains
+- DNS information
+- SSL/TLS certificates
+- software versions
+- login pages
+- authentication methods
+- file and folder permissions
+- Active Directory information
 
-例如发现 TCP 22 开放后，还需要确认：
+For example, after finding TCP 22 open, you still need to confirm:
 
-- 是否允许密码登录
-- 是否允许 root 直接登录
-- 是否使用旧版本
-- 是否对所有网络开放
-- 登录失败是否有日志
-- 是否配置账户锁定或速率限制
+- whether password login is allowed
+- whether direct root login is allowed
+- whether an old version is in use
+- whether it is open to all networks
+- whether failed logins are logged
+- whether account lockout or rate limiting is configured
 
 ---
 
-## 5. 漏洞分析
+## 5. Vulnerability analysis
 
-测试人员会把扫描结果与实际风险联系起来。
+Testers connect scan results to real risk.
 
-主要问题包括：
+Main questions:
 
-- 软件版本是否存在已知漏洞
-- 配置是否错误
-- 默认账户是否存在
-- 是否使用弱密码
-- 是否缺少安全更新
-- 文件权限是否过宽
-- 是否暴露不安全的服务
-- 是否泄露敏感数据
-- 是否缺少多因素认证
+- do the software versions have known vulnerabilities
+- is anything misconfigured
+- do default accounts exist
+- are weak passwords in use
+- are security updates missing
+- are file permissions too broad
+- are insecure services exposed
+- is sensitive data leaking
+- is multi-factor authentication missing
 
-常见漏洞类型：
+Common vulnerability types:
 
-- 弱密码
-- 默认凭据
-- 未修补软件
-- 错误权限
+- weak passwords
+- default credentials
+- unpatched software
+- wrong permissions
 - SQL Injection
 - Cross-Site Scripting
 - Broken Access Control
-- 不安全文件上传
-- 信息泄露
-- 错误的云权限
-- 不必要的开放端口
+- insecure file upload
+- information disclosure
+- misconfigured cloud permissions
+- unnecessary open ports
 
 ---
 
-## 6. 漏洞验证
+## 6. Vulnerability verification
 
-自动扫描器可能产生误报，所以渗透测试人员需要手动验证。
+Automated scanners can produce false positives, so pentesters verify manually.
 
-例如扫描器报告：
+For example, a scanner reports:
 
-> 服务器可能使用弱 TLS 配置。
+> The server may use a weak TLS configuration.
 
-测试人员需要进一步确认：
+The tester needs to confirm further:
 
-- 实际支持哪些 TLS 版本
-- 是否启用了弱加密套件
-- 是否真的可以被利用
-- 成功利用后可能造成什么影响
+- which TLS versions are actually supported
+- whether weak cipher suites are enabled
+- whether it can really be exploited
+- what impact a successful exploit could cause
 
-验证的目标不是破坏系统，而是获取足够证据证明风险。
+The goal of verification is not to break the system, but to gather enough evidence to prove the risk.
 
-常见证据包括：
+Common evidence includes:
 
-- 截图
-- HTTP 请求和响应
-- 系统日志
-- 受影响端口
-- 软件版本
-- 可以读取到的测试文件
-- 测试账户获得的权限
+- screenshots
+- HTTP requests and responses
+- system logs
+- affected ports
+- software versions
+- test files that could be read
+- privileges obtained by a test account
 
 ---
 
-## 7. 有限制地利用漏洞
+## 7. Limited exploitation
 
-只有授权范围允许时，测试人员才会进行漏洞利用。
+Testers only exploit when the authorized scope allows it.
 
-目的通常是回答：
+The goal is usually to answer:
 
-> 这个漏洞到底可以造成多大影响？
+> How much impact can this vulnerability actually cause?
 
-示例：
+Example:
 
 ```text
-普通用户
-→ 访问不属于自己的数据
-→ 权限提升
-→ 获得管理员权限
+Normal user
+→ accesses data that isn't theirs
+→ privilege escalation
+→ gains administrator rights
 ```
 
-另一个示例：
+Another example:
 
 ```text
-Web 漏洞
-→ 读取测试数据库
-→ 证明敏感信息可能泄露
+Web vulnerability
+→ reads the test database
+→ proves sensitive data could leak
 ```
 
-正式测试中通常遵循：
+Formal testing usually follows:
 
-- 使用测试账户
-- 只读取证明风险所需的最少数据
-- 不修改真实业务数据
-- 不进行拒绝服务攻击
-- 不长期保留访问权限
-- 发现高危问题后及时报告
-- 严格遵守交战规则
+- use test accounts
+- read only the minimum data needed to prove the risk
+- do not modify real business data
+- do not run denial-of-service attacks
+- do not keep long-term access
+- report high-risk issues promptly
+- strictly follow the rules of engagement
 
 ---
 
-## 8. 权限提升（Privilege Escalation）
+## 8. Privilege escalation
 
-获得普通账户后，测试人员会检查是否可以提升权限。
+After obtaining a normal account, the tester checks whether privileges can be escalated.
 
-常见检查内容：
+Common checks:
 
-- 普通 Linux 用户能否成为 root
-- 普通 Windows 用户能否成为 Administrator
-- 服务账户权限是否过大
-- sudo 配置是否错误
-- 计划任务是否不安全
-- 系统文件是否可被普通用户修改
-- 是否保存明文密码
-- 服务配置或路径权限是否错误
+- can a normal Linux user become root
+- can a normal Windows user become Administrator
+- are service account privileges too broad
+- is sudo misconfigured
+- are scheduled tasks insecure
+- can system files be modified by normal users
+- are cleartext passwords stored
+- are service configs or path permissions wrong
 
 ---
 
-## 9. 横向移动（Lateral Movement）
+## 9. Lateral movement
 
-在企业测试中，测试人员进入一台机器后，可能尝试访问其他授权系统。
+In enterprise tests, after landing on one machine the tester may try to reach other authorized systems.
 
-示例：
+Example:
 
 ```text
-员工电脑
-→ 文件服务器
-→ 应用服务器
-→ 域控制器
+Employee laptop
+→ file server
+→ application server
+→ domain controller
 ```
 
-主要检查：
+Main checks:
 
-- 密码是否重复使用
-- 网络是否正确分段
-- 普通用户是否能访问服务器网段
-- 管理协议是否暴露
-- 管理员凭据是否留在普通电脑
-- 防火墙是否可以阻止横向访问
+- are passwords reused
+- is the network properly segmented
+- can normal users reach the server subnet
+- are management protocols exposed
+- are admin credentials left on ordinary machines
+- can the firewall block lateral access
 
-在家庭实验室中可以模拟基础流程：
+In a home lab you can simulate the basic flow:
 
 ```text
 Kali
-→ Ubuntu 靶机
-→ 检查 Ubuntu 是否能够访问 Windows
-→ Wazuh 观察日志和告警
+→ Ubuntu target
+→ check whether Ubuntu can reach Windows
+→ Wazuh observes the logs and alerts
 ```
 
-开始学习时，应该先掌握扫描、日志和防火墙，再进入复杂的横向移动实验。
+When starting out, master scanning, logs and firewalls first, before moving on to complex lateral-movement labs.
 
 ---
 
-## 10. 检查检测能力
+## 10. Check detection capability
 
-现代渗透测试不只问：
+Modern penetration testing doesn't only ask:
 
-> 能不能进入系统？
+> Can we get into the system?
 
-还会问：
+It also asks:
 
-> 安全部门能不能发现？
+> Can the security team detect it?
 
-需要观察：
+Things to observe:
 
-- Windows Event Viewer 是否记录登录事件
-- Linux 日志是否记录 SSH 失败
-- Wazuh 是否触发告警
-- 防火墙是否记录连接
-- IDS/IPS 是否检测到扫描
-- 安全团队是否响应异常活动
+- does Windows Event Viewer record the login events
+- do Linux logs record the SSH failures
+- does Wazuh raise an alert
+- does the firewall log the connections
+- does an IDS/IPS detect the scan
+- does the security team respond to the abnormal activity
 
-Home Lab 示例：
+Home lab example:
 
 ```text
-Kali 发起 Nmap 扫描
+Kali launches an Nmap scan
         ↓
-Ubuntu 记录网络或登录活动
+Ubuntu logs the network or login activity
         ↓
-Wazuh 收集日志
+Wazuh collects the logs
         ↓
-查看是否产生告警
+Check whether an alert is generated
 ```
 
 ---
 
-## 11. 清理测试环境
+## 11. Clean up the test environment
 
-测试结束后，需要恢复环境，包括：
+After testing, restore the environment, including:
 
-- 删除测试账户
-- 删除上传的测试文件
-- 删除测试密钥
-- 关闭临时开放的端口
-- 恢复修改的配置
-- 停止测试服务
-- 清除测试创建的计划任务
-- 向客户说明测试期间做过的修改
+- delete test accounts
+- delete uploaded test files
+- delete test keys
+- close temporarily opened ports
+- restore modified configs
+- stop test services
+- remove scheduled tasks created during testing
+- tell the client what changes were made during the test
 
-这里的清理不是为了隐藏攻击，而是避免给客户留下新的安全风险。
+This cleanup isn't to hide the attack — it's to avoid leaving the client with new security risks.
 
 ---
 
-## 12. 编写渗透测试报告
+## 12. Writing the penetration test report
 
-报告通常是最重要的交付物。
+The report is usually the most important deliverable.
 
 ### 12.1 Executive Summary
 
-面向管理人员，使用容易理解的语言说明：
+For management, in plain language, explaining:
 
-- 整体风险
-- 最严重的问题
-- 对业务可能造成的影响
-- 应优先修复什么
+- the overall risk
+- the most serious issues
+- the possible business impact
+- what should be fixed first
 
 ### 12.2 Technical Findings
 
-面向 IT 和安全人员。
+For IT and security staff.
 
-| 项目 | 内容 |
+| Item | Content |
 |---|---|
-| Finding | 漏洞名称 |
+| Finding | Vulnerability name |
 | Severity | Critical / High / Medium / Low |
-| Affected Asset | 受影响的 IP、域名或系统 |
-| Evidence | 截图、日志、请求和响应 |
-| Impact | 攻击者可以做什么 |
-| Reproduction | 如何在授权环境中重现 |
-| Remediation | 如何修复 |
-| References | CVE、厂商文档或安全标准 |
+| Affected Asset | The affected IP, domain or system |
+| Evidence | Screenshots, logs, requests and responses |
+| Impact | What an attacker could do |
+| Reproduction | How to reproduce it in an authorized environment |
+| Remediation | How to fix it |
+| References | CVE, vendor docs or security standards |
 
-示例发现：
+Example finding:
 
 ```text
-问题：
-SSH 允许整个实验网段访问。
+Issue:
+SSH is open to the entire lab subnet.
 
-证据：
-10.10.20.20 的 TCP 22 端口对所有实验主机开放。
+Evidence:
+TCP 22 on 10.10.20.20 is open to all lab hosts.
 
-影响：
-任何进入实验网段的设备都可以尝试登录 SSH。
+Impact:
+Any device that reaches the lab subnet can attempt an SSH login.
 
-建议：
-只允许管理机 10.10.20.10 访问 TCP 22，
-并禁用 root 密码登录。
+Recommendation:
+Only allow the management host 10.10.20.10 to reach TCP 22,
+and disable root password login.
 ```
 
 ---
 
-## 13. 修复后重新测试
+## 13. Re-test after remediation
 
-客户完成修复后，测试人员会再次检查。
+After the client finishes remediation, the tester checks again.
 
-第一次扫描：
+First scan:
 
 ```text
 22/tcp open ssh
@@ -1577,7 +1585,7 @@ SSH 允许整个实验网段访问。
 23/tcp open telnet
 ```
 
-修复后：
+After remediation:
 
 ```text
 22/tcp filtered
@@ -1585,132 +1593,132 @@ SSH 允许整个实验网段访问。
 23/tcp closed
 ```
 
-重新测试用于确认：
+Re-testing confirms:
 
-- 漏洞确实已经修复
-- 没有引入新的问题
-- 防火墙规则已经生效
-- 风险已经降低
+- the vulnerability really is fixed
+- no new problems were introduced
+- the firewall rules took effect
+- the risk has been reduced
 
 ---
 
-# 漏洞扫描和渗透测试的区别
+# The difference between vulnerability scanning and penetration testing
 
-| 类型 | 主要工作 |
+| Type | Main work |
 |---|---|
-| Vulnerability Scan | 使用工具自动查找可能存在的漏洞 |
-| Vulnerability Assessment | 分析、确认并排列漏洞优先级 |
-| Penetration Test | 在授权范围内验证漏洞是否可以利用 |
-| Red Team | 模拟真实攻击者，测试人员、流程和技术 |
-| Security Audit | 检查系统是否符合政策、标准或法规 |
+| Vulnerability Scan | Use tools to automatically find possible vulnerabilities |
+| Vulnerability Assessment | Analyze, confirm and prioritize vulnerabilities |
+| Penetration Test | Verify, within the authorized scope, whether vulnerabilities can be exploited |
+| Red Team | Simulate a real attacker, testing people, processes and technology |
+| Security Audit | Check whether systems comply with policies, standards or regulations |
 
-扫描工具发现 100 个问题，并不代表已经完成渗透测试。
+A scanner finding 100 issues does not mean a penetration test is done.
 
-渗透测试人员还需要判断：
+The tester still needs to judge:
 
-- 哪些是误报
-- 哪些可以真正利用
-- 哪些会造成实际业务影响
-- 应该按照什么顺序修复
-
----
-
-# 渗透测试人员的一天
-
-一个典型工作日可能是：
-
-```text
-09:00  与客户确认测试范围
-09:30  检查资产和扫描结果
-10:30  手动验证高风险问题
-12:00  整理证据和实验记录
-13:00  测试 Web 登录和权限控制
-15:00  查看日志和检测告警
-16:00  报告紧急漏洞
-16:30  编写技术发现和修复建议
-```
-
-渗透测试人员并不是八小时都在运行攻击工具。
+- which are false positives
+- which can really be exploited
+- which cause real business impact
+- in what order they should be fixed
 
 ---
 
-# 适合 Home Lab 的完整练习流程
+# A day in the life of a penetration tester
 
-每次实验可以按照以下顺序：
+A typical workday might be:
 
 ```text
-1. 创建快照
-2. 确认测试范围
-3. 主机发现
-4. 端口扫描
-5. 服务枚举
-6. 手动验证
-7. 查看 Windows/Linux 日志
-8. 查看 Wazuh 告警
-9. 配置防火墙或修复漏洞
-10. 重新扫描
-11. 编写一页报告
-12. 恢复快照
+09:00  Confirm the test scope with the client
+09:30  Review assets and scan results
+10:30  Manually verify high-risk issues
+12:00  Organize evidence and lab notes
+13:00  Test web logins and access control
+15:00  Review logs and detection alerts
+16:00  Report urgent vulnerabilities
+16:30  Write technical findings and remediation advice
+```
+
+A pentester does not spend eight hours running attack tools.
+
+---
+
+# A complete practice workflow for the home lab
+
+Each lab can follow this order:
+
+```text
+1. Create a snapshot
+2. Confirm the test scope
+3. Host discovery
+4. Port scanning
+5. Service enumeration
+6. Manual verification
+7. Review Windows/Linux logs
+8. Review Wazuh alerts
+9. Configure the firewall or remediate the vulnerability
+10. Re-scan
+11. Write a one-page report
+12. Restore the snapshot
 ```
 
 ---
 
-# 第一个推荐项目：Ubuntu 安全评估
+# First recommended project: Ubuntu security assessment
 
-## 项目目标
+## Project goal
 
-对 Ubuntu 靶机 `10.10.20.20` 进行一次完整、可控的安全评估。
+Perform a complete, controlled security assessment of the Ubuntu target `10.10.20.20`.
 
-## 检查内容
+## What to check
 
-- 哪些端口开放
-- 运行了哪些服务
-- SSH 是否安全
-- Juice Shop 使用哪个端口
-- UFW 是否开启
-- 登录失败是否留下日志
-- Wazuh 是否检测到扫描
-- 修复后开放端口是否减少
+- which ports are open
+- which services are running
+- whether SSH is secure
+- which port Juice Shop uses
+- whether UFW is enabled
+- whether failed logins leave logs
+- whether Wazuh detects the scan
+- whether the number of open ports drops after remediation
 
-## 建议流程
+## Suggested workflow
 
-### 1. 确认授权范围
+### 1. Confirm the authorized scope
 
 ```text
-Attacker：10.10.20.10
-Target：10.10.20.20
-Network：CyberLab 10.10.20.0/24
-Allowed：扫描、服务枚举、日志检查、防火墙测试
-Not Allowed：DoS、破坏数据、攻击真实网络
+Attacker:    10.10.20.10
+Target:      10.10.20.20
+Network:     CyberLab 10.10.20.0/24
+Allowed:     scanning, service enumeration, log review, firewall testing
+Not Allowed: DoS, destroying data, attacking the real network
 ```
 
-### 2. 主机发现
+### 2. Host discovery
 
 ```bash
 sudo nmap -sn 10.10.20.0/24
 ```
 
-### 3. 基础端口扫描
+### 3. Basic port scan
 
 ```bash
 nmap 10.10.20.20
 ```
 
-### 4. 服务版本识别
+### 4. Service version identification
 
 ```bash
 sudo nmap -sV 10.10.20.20
 ```
 
-### 5. 全端口扫描
+### 5. Full port scan
 
 ```bash
 sudo nmap -sS -p- 10.10.20.20
 ```
 
-### 6. 检查目标日志
+### 6. Check the target logs
 
-Ubuntu：
+Ubuntu:
 
 ```bash
 sudo journalctl -u ssh
@@ -1720,15 +1728,15 @@ sudo journalctl -u ssh
 sudo tail -f /var/log/auth.log
 ```
 
-### 7. 查看防火墙
+### 7. Review the firewall
 
 ```bash
 sudo ufw status verbose
 ```
 
-### 8. 修复问题
+### 8. Remediate
 
-示例：
+Example:
 
 ```bash
 sudo ufw default deny incoming
@@ -1737,42 +1745,42 @@ sudo ufw allow from 10.10.20.10 to any port 22 proto tcp
 sudo ufw enable
 ```
 
-### 9. 重新扫描
+### 9. Re-scan
 
 ```bash
 sudo nmap -sV -p- 10.10.20.20
 ```
 
-### 10. 编写报告
+### 10. Write the report
 
-记录：
+Record:
 
-- 扫描结果
-- 发现的问题
-- 风险等级
-- 证据
-- 修复操作
-- 修复后的验证结果
-- 本次实验学到的内容
+- the scan results
+- the issues found
+- the risk levels
+- the evidence
+- the remediation actions
+- the post-remediation verification
+- what you learned in this lab
 
 ---
 
-# 职业核心思维
+# The core professional mindset
 
-真正的渗透测试人员不是只会“进入系统”的人。
+A real penetration tester is not just someone who can "get into a system."
 
-他们必须做到：
+They must:
 
-> **有授权、控制风险、保护数据、保存证据、解释业务影响、提出可执行的修复方法。**
+> **Have authorization, control risk, protect data, preserve evidence, explain business impact, and propose actionable remediation.**
 
-攻击工具只是工作的一部分。
+Attack tools are only part of the job.
 
-真正有价值的能力是：
+The truly valuable skills are:
 
-- 判断
-- 验证
-- 记录
-- 沟通
-- 报告
-- 修复建议
-- 重新测试
+- judgment
+- verification
+- documentation
+- communication
+- reporting
+- remediation advice
+- re-testing
